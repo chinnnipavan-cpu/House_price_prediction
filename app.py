@@ -1,12 +1,22 @@
 import streamlit as st
 import joblib
-import numpy as  np
+import pandas as pd
+from pathlib import Path
+
 st.set_page_config(page_title="House Price Prediction", page_icon=":house:", layout="wide")
 
 @st.cache_resource
 def load_model():
-    model=joblib.load('house_price_model.pkl')
-    return model
+    return joblib.load(Path(__file__).with_name("house_prediction.pkl"))
+
+@st.cache_data
+def load_default_features(feature_names):
+    data_path = Path(__file__).with_name("Cleaned_datset.csv")
+    training_data = pd.read_csv(data_path).drop(columns=["SalePrice"])
+    encoded_data = pd.get_dummies(training_data, drop_first=True)
+    defaults = encoded_data.median(numeric_only=True).to_frame().T
+    return defaults.reindex(columns=feature_names, fill_value=0)
+
 model=load_model()
 
 st.title("House Price Prediction")
@@ -18,7 +28,14 @@ garage=st.number_input("Enter the number of cars that can fit in the garage:", m
 year_built=st.number_input("Enter the year the house was built:", min_value=1800, max_value=2023, value=2020)
 
 if st.button("Predict Price"):
-    input_data=np.array([[area, bedrooms, bathrooms, garage, year_built ]])
+    feature_names = tuple(model.feature_names_in_)
+    input_data = load_default_features(feature_names)
+    input_data.loc[0, ["GrLivArea", "BedroomAbvGr", "FullBath", "GarageCars", "YearBuilt"]] = [
+        area,
+        bedrooms,
+        bathrooms,
+        garage,
+        year_built,
+    ]
     prediction=model.predict(input_data)
     st.success(f"The predicted price of the house is: ${prediction[0]:,.2f}")
-
